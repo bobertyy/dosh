@@ -1,4 +1,4 @@
-use crate::account_code::AccountCode;
+use super::account_code::AccountCode;
 
 #[derive(Debug, PartialEq)]
 pub enum AccountClass {
@@ -63,7 +63,6 @@ impl Account {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::account_code::AccountCode;
 
     mod new_with_description {
         use super::*;

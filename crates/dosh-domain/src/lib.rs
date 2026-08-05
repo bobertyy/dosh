@@ -1,5 +1,6 @@
-pub mod account;
-pub mod account_code;
+pub mod model;
+pub mod port;
+pub mod use_case;
 
 pub struct Greeter;
 

@@ -1,5 +1,3 @@
-use dosh_application::greet;
-
 fn main() {
-    greet()
+    println!("Aup, duck!")
 }
