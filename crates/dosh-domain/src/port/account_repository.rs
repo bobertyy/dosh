@@ -11,8 +11,8 @@ pub enum CreateAccountError {
 }
 
 pub trait AccountRepository {
-    fn create(
-        &self,
-        account: &Account,
-    ) -> Pin<Box<dyn Future<Output = Result<(), CreateAccountError>> + Send>>;
+    fn create<'a>(
+        &'a self,
+        account: &'a Account,
+    ) -> Pin<Box<dyn Future<Output = Result<(), CreateAccountError>> + Send + 'a>>;
 }

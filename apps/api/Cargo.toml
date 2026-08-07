@@ -5,4 +5,9 @@ edition = "2024"
 
 [dependencies]
 dosh-domain = { path = "../../crates/dosh-domain" }
+sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "migrate", "macros"] }
 tokio = { version = "1.50.0", features = ["full"] }
+
+[dev-dependencies]
+testcontainers = "0.27.0"
+testcontainers-modules = { version = "0.15.0", features = ["postgres"] }
