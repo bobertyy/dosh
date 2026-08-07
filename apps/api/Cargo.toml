@@ -5,6 +5,4 @@ edition = "2024"
 
 [dependencies]
 dosh-domain = { path = "../../crates/dosh-domain" }
-sqlx = { version = "0.8.6", features = ["runtime-tokio", "sqlite", "migrate"] }
 tokio = { version = "1.50.0", features = ["full"] }
-tonic = { version = "0.12.3", features = ["transport"] }
