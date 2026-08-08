@@ -10,7 +10,7 @@ pub enum CreateAccountError {
     AlreadyExists(AccountCode),
 }
 
-pub trait AccountRepository {
+pub trait AccountRepository: Send + Sync {
     fn create<'a>(
         &'a self,
         account: &'a Account,

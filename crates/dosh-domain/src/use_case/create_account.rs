@@ -29,6 +29,10 @@ impl From<account_repository::CreateAccountError> for CreateAccountUseCaseError 
 }
 
 impl CreateAccountUseCase {
+    pub fn new(account_repo: Arc<dyn AccountRepository>) -> Self {
+        Self { account_repo }
+    }
+
     pub async fn execute(&self, account: &Account) -> Result<(), CreateAccountUseCaseError> {
         self.account_repo
             .create(account)
