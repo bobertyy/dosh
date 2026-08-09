@@ -1,56 +1,18 @@
+mod common;
+
 use std::assert_matches;
 
-use api::adapter::postgres::{account_repository::PostgresAccountRepository, db};
+use api::adapter::postgres::account_repository::PostgresAccountRepository;
+use common::{TestDb, migrated_database};
 use dosh_domain::{
     model::{
         account::{Account, AccountClass},
-        account_code::AccountCode,
+        account_code::{AccountCode, AccountCodePrefix},
+        account_filter::AccountFilter,
     },
     port::account_repository::{AccountRepository, CreateAccountError},
 };
 use sqlx::PgPool;
-use testcontainers_modules::{
-    postgres::Postgres,
-    testcontainers::{ContainerAsync, ImageExt, runners::AsyncRunner},
-};
-
-const POSTGRES_TAG: &str = "18-alpine";
-
-struct TestDb {
-    _container: ContainerAsync<Postgres>,
-    pool: PgPool,
-}
-
-async fn start_database() -> TestDb {
-    let container = Postgres::default()
-        .with_tag(POSTGRES_TAG)
-        .start()
-        .await
-        .expect("failed to start postgres container");
-
-    let host = container.get_host().await.expect("failed to get host");
-    let port = container
-        .get_host_port_ipv4(5432)
-        .await
-        .expect("failed to get port");
-
-    let pool = db::connect(&format!(
-        "postgres://postgres:postgres@{host}:{port}/postgres"
-    ))
-    .await
-    .expect("failed to connect to postgres");
-
-    TestDb {
-        _container: container,
-        pool,
-    }
-}
-
-async fn migrated_database() -> TestDb {
-    let db = start_database().await;
-    db::migrate(&db.pool).await.expect("failed to migrate");
-    db
-}
 
 struct StoredAccount {
     class: String,
@@ -70,6 +32,7 @@ async fn fetch_account(pool: &PgPool, code: &str) -> Option<StoredAccount> {
 
 mod migrate {
     use super::*;
+    use api::adapter::postgres::db;
 
     #[tokio::test]
     async fn creates_the_accounts_table() {
@@ -172,5 +135,176 @@ mod create {
         let stored = fetch_account(&db.pool, "200").await.unwrap();
         assert_eq!(stored.class, "revenue");
         assert_eq!(stored.description, None);
+    }
+}
+
+mod list {
+    use super::*;
+
+    /// A repository holding one account per case, ready to be listed.
+    async fn seeded_repository(
+        cases: &[(&str, AccountClass)],
+    ) -> (TestDb, PostgresAccountRepository) {
+        let db = migrated_database().await;
+        let repository = PostgresAccountRepository::new(db.pool.clone());
+
+        for (code, class) in cases {
+            let account = Account::new(AccountCode::parse(*code).unwrap(), *class);
+            repository.create(&account).await.unwrap();
+        }
+
+        (db, repository)
+    }
+
+    fn codes(accounts: &[Account]) -> Vec<String> {
+        accounts
+            .iter()
+            .map(|account| account.code().to_string())
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn returns_accounts_ordered_by_code() {
+        let (_db, repository) = seeded_repository(&[
+            ("200", AccountClass::Revenue),
+            ("100", AccountClass::Asset),
+            ("1000", AccountClass::Asset),
+            ("110", AccountClass::Asset),
+        ])
+        .await;
+
+        let accounts = repository
+            .list(&AccountFilter::default(), None, 10)
+            .await
+            .unwrap();
+
+        // Codes are text, so they order as text: 1000 sits inside the 100s.
+        assert_eq!(codes(&accounts), vec!["100", "1000", "110", "200"]);
+    }
+
+    #[tokio::test]
+    async fn returns_the_account_as_it_was_stored() {
+        let db = migrated_database().await;
+        let repository = PostgresAccountRepository::new(db.pool.clone());
+
+        let stored = Account::new_with_description(
+            AccountCode::parse("200").unwrap(),
+            AccountClass::Revenue,
+            "Sales revenue".to_string(),
+        )
+        .unwrap();
+        repository.create(&stored).await.unwrap();
+
+        let accounts = repository
+            .list(&AccountFilter::default(), None, 10)
+            .await
+            .unwrap();
+
+        let account = accounts.first().unwrap();
+        assert_eq!(account.code(), &AccountCode::parse("200").unwrap());
+        assert_eq!(account.class(), &AccountClass::Revenue);
+        assert_eq!(account.description(), &Some("Sales revenue".to_string()));
+    }
+
+    #[tokio::test]
+    async fn returns_no_more_than_the_limit() {
+        let (_db, repository) = seeded_repository(&[
+            ("100", AccountClass::Asset),
+            ("110", AccountClass::Asset),
+            ("200", AccountClass::Revenue),
+        ])
+        .await;
+
+        let accounts = repository
+            .list(&AccountFilter::default(), None, 2)
+            .await
+            .unwrap();
+
+        assert_eq!(codes(&accounts), vec!["100", "110"]);
+    }
+
+    #[tokio::test]
+    async fn starts_after_the_given_code() {
+        let (_db, repository) = seeded_repository(&[
+            ("100", AccountClass::Asset),
+            ("110", AccountClass::Asset),
+            ("200", AccountClass::Revenue),
+        ])
+        .await;
+
+        let after = AccountCode::parse("110").unwrap();
+
+        let accounts = repository
+            .list(&AccountFilter::default(), Some(&after), 10)
+            .await
+            .unwrap();
+
+        assert_eq!(codes(&accounts), vec!["200"]);
+    }
+
+    #[tokio::test]
+    async fn filters_by_class() {
+        let (_db, repository) = seeded_repository(&[
+            ("100", AccountClass::Asset),
+            ("200", AccountClass::Revenue),
+            ("300", AccountClass::Expense),
+        ])
+        .await;
+
+        let filter = AccountFilter::new(Some(AccountClass::Revenue), None);
+
+        let accounts = repository.list(&filter, None, 10).await.unwrap();
+
+        assert_eq!(codes(&accounts), vec!["200"]);
+    }
+
+    #[tokio::test]
+    async fn filters_by_code_prefix() {
+        let (_db, repository) = seeded_repository(&[
+            ("100", AccountClass::Asset),
+            ("200", AccountClass::Revenue),
+            ("210", AccountClass::Revenue),
+            ("2", AccountClass::Revenue),
+        ])
+        .await;
+
+        let filter = AccountFilter::new(None, Some(AccountCodePrefix::parse("21").unwrap()));
+
+        let accounts = repository.list(&filter, None, 10).await.unwrap();
+
+        assert_eq!(codes(&accounts), vec!["210"]);
+    }
+
+    #[tokio::test]
+    async fn applies_every_filter_at_once() {
+        let (_db, repository) = seeded_repository(&[
+            ("200", AccountClass::Revenue),
+            ("210", AccountClass::Revenue),
+            ("220", AccountClass::Revenue),
+            ("230", AccountClass::Asset),
+            ("300", AccountClass::Revenue),
+        ])
+        .await;
+
+        let filter = AccountFilter::new(
+            Some(AccountClass::Revenue),
+            Some(AccountCodePrefix::parse("2").unwrap()),
+        );
+        let after = AccountCode::parse("200").unwrap();
+
+        let accounts = repository.list(&filter, Some(&after), 10).await.unwrap();
+
+        assert_eq!(codes(&accounts), vec!["210", "220"]);
+    }
+
+    #[tokio::test]
+    async fn returns_nothing_when_no_account_matches() {
+        let (_db, repository) = seeded_repository(&[("100", AccountClass::Asset)]).await;
+
+        let filter = AccountFilter::new(Some(AccountClass::Revenue), None);
+
+        let accounts = repository.list(&filter, None, 10).await.unwrap();
+
+        assert!(accounts.is_empty());
     }
 }

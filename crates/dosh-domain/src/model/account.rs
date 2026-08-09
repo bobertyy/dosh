@@ -1,6 +1,9 @@
-use super::account_code::AccountCode;
+use super::{
+    account_code::{AccountCode, AccountCodeParseError},
+    page_cursor::{PageCursor, Pageable},
+};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum AccountClass {
     Asset,
     Equity,
@@ -60,6 +63,19 @@ impl Account {
     }
 }
 
+impl Pageable for Account {
+    type Key = AccountCode;
+    type KeyError = AccountCodeParseError;
+
+    fn page_key(&self) -> &AccountCode {
+        &self.code
+    }
+
+    fn key_from_cursor(cursor: &PageCursor) -> Result<AccountCode, AccountCodeParseError> {
+        AccountCode::parse(cursor.to_string())
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -92,6 +108,41 @@ mod test {
             .unwrap_err();
 
             assert_matches!(error, AccountCreationError::EmptyDescription);
+        }
+    }
+
+    mod pageable {
+        use super::*;
+        use std::assert_matches;
+
+        #[test]
+        fn is_positioned_by_its_code() {
+            let account = Account::new(AccountCode::parse("200").unwrap(), AccountClass::Revenue);
+
+            assert_eq!(
+                PageCursor::from(&account),
+                PageCursor::parse("200").unwrap()
+            );
+        }
+
+        #[test]
+        fn reads_a_code_back_out_of_a_cursor() {
+            let cursor = PageCursor::parse("200").unwrap();
+
+            assert_eq!(
+                Account::key_from_cursor(&cursor).unwrap(),
+                AccountCode::parse("200").unwrap()
+            );
+        }
+
+        #[test]
+        fn returns_error_when_a_cursor_is_not_a_code() {
+            let cursor = PageCursor::parse("not a code").unwrap();
+
+            assert_matches!(
+                Account::key_from_cursor(&cursor).unwrap_err(),
+                AccountCodeParseError::InvalidFormat(input) if input == "not a code"
+            );
         }
     }
 }
