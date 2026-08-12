@@ -15,6 +15,14 @@ Rust workspace following hexagonal architecture (ports and adapters).
 - Dependencies point inward: adapters and apps depend on `dosh-domain`; `dosh-domain` depends on nothing outside itself.
 - Ports are defined in the domain as traits. Adapters that implement them live outside the domain crate.
 
+## Comments
+
+- Code is expected to document itself. A name, a signature, or a type that needs a comment to be understood is a name, signature, or type to change first.
+- Doc comments are welcome on the things a reader meets from outside — a type, a public function, an endpoint — and say what it is in a line or two. They are not the place to justify the design, walk through the body, or restate what the signature already says.
+- Ordinary `//` comments are a last resort, for the rare fact the code cannot carry: a constraint imposed from elsewhere, a deliberate choice whose alternative looks equally correct. Everything else should be deleted rather than written.
+- Never narrate. A comment that paraphrases the line below it, labels a branch of a match, or explains why an error maps to the status it obviously maps to is noise.
+- Tests are code too: a test name states the behaviour, so a comment above it is redundant, and a helper needs a doc comment only when what it sets up is not visible in its body.
+
 ## Adapters
 
 - Adapters live in `apps/api/src/adapter/<technology>/`. `api` is a lib *and* a bin — `lib.rs` exists so integration tests can import adapters.

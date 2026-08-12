@@ -1,14 +1,17 @@
 use std::pin::Pin;
 
 use dosh_domain::{
-    model::{account::Account, account_code::AccountCode, account_filter::AccountFilter},
-    port::account_repository::{AccountRepository, CreateAccountError, ListAccountsError},
+    model::{
+        account::Account, account_code::AccountCode, account_code_lookup::AccountCodeLookup,
+        account_filter::AccountFilter,
+    },
+    port::account_repository::{
+        AccountRepository, CreateAccountError, FindAccountCodesError, ListAccountsError,
+    },
 };
 use sqlx::PgPool;
 
-use crate::adapter::postgres::dto::{
-    account::AccountPgRecord, account_class::account_class_value,
-};
+use crate::adapter::postgres::dto::{account::AccountPgRecord, account_class::account_class_value};
 
 pub struct PostgresAccountRepository {
     pool: PgPool,
@@ -85,6 +88,31 @@ impl AccountRepository for PostgresAccountRepository {
                 .into_iter()
                 .map(|record| Account::try_from(record).map_err(|_| ListAccountsError::Internal))
                 .collect()
+        })
+    }
+
+    fn look_up_codes<'a>(
+        &'a self,
+        codes: &'a [AccountCode],
+    ) -> Pin<Box<dyn Future<Output = Result<AccountCodeLookup, FindAccountCodesError>> + Send + 'a>>
+    {
+        Box::pin(async move {
+            let asked_after: Vec<String> = codes.iter().map(ToString::to_string).collect();
+
+            let rows = sqlx::query_scalar!(
+                "SELECT code FROM accounts WHERE code = ANY($1)",
+                &asked_after[..]
+            )
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|_| FindAccountCodesError::Internal)?;
+
+            let existing: Vec<AccountCode> = rows
+                .into_iter()
+                .map(|code| AccountCode::parse(code).map_err(|_| FindAccountCodesError::Internal))
+                .collect::<Result<_, _>>()?;
+
+            Ok(AccountCodeLookup::split(codes, &existing))
         })
     }
 }

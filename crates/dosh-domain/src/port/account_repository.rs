@@ -1,6 +1,9 @@
 use std::pin::Pin;
 
-use crate::model::{account::Account, account_code::AccountCode, account_filter::AccountFilter};
+use crate::model::{
+    account::Account, account_code::AccountCode, account_code_lookup::AccountCodeLookup,
+    account_filter::AccountFilter,
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum CreateAccountError {
@@ -12,6 +15,12 @@ pub enum CreateAccountError {
 
 #[derive(Debug, thiserror::Error)]
 pub enum ListAccountsError {
+    #[error("internal account repository error")]
+    Internal,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum FindAccountCodesError {
     #[error("internal account repository error")]
     Internal,
 }
@@ -33,4 +42,10 @@ pub trait AccountRepository: Send + Sync {
         after: Option<&'a AccountCode>,
         limit: u32,
     ) -> Pin<Box<dyn Future<Output = Result<Vec<Account>, ListAccountsError>> + Send + 'a>>;
+
+    /// Which of `codes` name an account that exists, and which name none.
+    fn look_up_codes<'a>(
+        &'a self,
+        codes: &'a [AccountCode],
+    ) -> Pin<Box<dyn Future<Output = Result<AccountCodeLookup, FindAccountCodesError>> + Send + 'a>>;
 }

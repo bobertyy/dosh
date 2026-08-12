@@ -37,6 +37,7 @@ name = "api"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "chrono",
  "dosh-domain",
  "serde",
  "serde_json",
@@ -46,6 +47,7 @@ dependencies = [
  "testcontainers-modules",
  "thiserror",
  "tokio",
+ "uuid",
 ]
 
 [[package]]
@@ -531,6 +533,7 @@ dependencies = [
 name = "dosh-domain"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "thiserror",
  "uuid",
 ]
@@ -2038,6 +2041,7 @@ dependencies = [
  "base64",
  "bytes",
  "cfg-if",
+ "chrono",
  "crc",
  "crossbeam-queue",
  "either",
@@ -2062,6 +2066,7 @@ dependencies = [
  "tokio-stream",
  "tracing",
  "url",
+ "uuid",
  "webpki-roots",
 ]
 
@@ -2095,7 +2100,9 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "sqlx-core",
+ "sqlx-mysql",
  "sqlx-postgres",
+ "sqlx-sqlite",
  "syn 2.0.119",
  "thiserror",
  "tokio",
@@ -2111,6 +2118,7 @@ dependencies = [
  "bitflags",
  "byteorder",
  "bytes",
+ "chrono",
  "crc",
  "digest 0.11.3",
  "dotenvy",
@@ -2126,6 +2134,7 @@ dependencies = [
  "sqlx-core",
  "thiserror",
  "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -2138,6 +2147,7 @@ dependencies = [
  "base64",
  "bitflags",
  "byteorder",
+ "chrono",
  "crc",
  "dotenvy",
  "etcetera",
@@ -2160,6 +2170,7 @@ dependencies = [
  "stringprep",
  "thiserror",
  "tracing",
+ "uuid",
  "whoami",
 ]
 
@@ -2170,6 +2181,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "488e99c397a62007e4229aec669a179816339afc6d2620ca6fa420dbee2e982c"
 dependencies = [
  "atoi",
+ "chrono",
  "flume",
  "form_urlencoded",
  "futures-channel",
@@ -2185,6 +2197,7 @@ dependencies = [
  "thiserror",
  "tracing",
  "url",
+ "uuid",
 ]
 
 [[package]]

@@ -138,23 +138,102 @@ mod create {
     }
 }
 
-mod list {
+mod look_up_codes {
     use super::*;
 
-    /// A repository holding one account per case, ready to be listed.
-    async fn seeded_repository(
-        cases: &[(&str, AccountClass)],
-    ) -> (TestDb, PostgresAccountRepository) {
-        let db = migrated_database().await;
-        let repository = PostgresAccountRepository::new(db.pool.clone());
+    async fn repository_holding(codes: &[&str]) -> (TestDb, PostgresAccountRepository) {
+        let cases: Vec<(&str, AccountClass)> = codes
+            .iter()
+            .map(|code| (*code, AccountClass::Asset))
+            .collect();
 
-        for (code, class) in cases {
-            let account = Account::new(AccountCode::parse(*code).unwrap(), *class);
-            repository.create(&account).await.unwrap();
-        }
-
-        (db, repository)
+        seeded_repository(&cases).await
     }
+
+    fn parse(codes: &[&str]) -> Vec<AccountCode> {
+        codes
+            .iter()
+            .map(|code| AccountCode::parse(*code).unwrap())
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn finds_the_codes_it_holds() {
+        let (_db, repository) = repository_holding(&["100", "200"]).await;
+
+        let lookup = repository
+            .look_up_codes(&parse(&["200", "100"]))
+            .await
+            .unwrap();
+
+        assert_eq!(lookup.found(), parse(&["100", "200"]));
+        assert!(lookup.missing().is_empty());
+    }
+
+    #[tokio::test]
+    async fn misses_the_codes_it_does_not_hold() {
+        let (_db, repository) = repository_holding(&["100"]).await;
+
+        let lookup = repository
+            .look_up_codes(&parse(&["100", "999"]))
+            .await
+            .unwrap();
+
+        assert_eq!(lookup.found(), parse(&["100"]));
+        assert_eq!(lookup.missing(), parse(&["999"]));
+    }
+
+    #[tokio::test]
+    async fn misses_every_code_when_it_holds_none_of_them() {
+        let (_db, repository) = repository_holding(&["100"]).await;
+
+        let lookup = repository
+            .look_up_codes(&parse(&["999", "998"]))
+            .await
+            .unwrap();
+
+        assert!(lookup.found().is_empty());
+        assert_eq!(lookup.missing(), parse(&["998", "999"]));
+    }
+
+    #[tokio::test]
+    async fn answers_for_no_codes_at_all() {
+        let (_db, repository) = repository_holding(&["100"]).await;
+
+        let lookup = repository.look_up_codes(&[]).await.unwrap();
+
+        assert!(lookup.found().is_empty());
+        assert!(lookup.missing().is_empty());
+    }
+
+    #[tokio::test]
+    async fn names_a_code_once_however_often_it_is_asked_after() {
+        let (_db, repository) = repository_holding(&["100"]).await;
+
+        let lookup = repository
+            .look_up_codes(&parse(&["100", "100", "999", "999"]))
+            .await
+            .unwrap();
+
+        assert_eq!(lookup.found(), parse(&["100"]));
+        assert_eq!(lookup.missing(), parse(&["999"]));
+    }
+}
+
+async fn seeded_repository(cases: &[(&str, AccountClass)]) -> (TestDb, PostgresAccountRepository) {
+    let db = migrated_database().await;
+    let repository = PostgresAccountRepository::new(db.pool.clone());
+
+    for (code, class) in cases {
+        let account = Account::new(AccountCode::parse(*code).unwrap(), *class);
+        repository.create(&account).await.unwrap();
+    }
+
+    (db, repository)
+}
+
+mod list {
+    use super::*;
 
     fn codes(accounts: &[Account]) -> Vec<String> {
         accounts
