@@ -5,11 +5,29 @@ use super::{
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum AccountClass {
-    Asset,
+    Asset(AssetClass),
     Equity,
+    Expense(ExpenseClass),
+    Liability(LiabilityClass),
+    Revenue(RevenueClass),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum AssetClass {
+    Bank,
+    Current,
+    Fixed,
+    Inventory,
+    NonCurrent,
+    Prepayement,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ExpenseClass {
+    Depreciation,
+    DirectCosts,
     Expense,
-    Liability,
-    Revenue,
+    Overhead,
 }
 
 #[derive(Debug)]
@@ -17,6 +35,18 @@ pub struct Account {
     code: AccountCode,
     class: AccountClass,
     description: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum LiabilityClass {
+    Current,
+    NonCurrent,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum RevenueClass {
+    OtherIncome,
+    Sales,
 }
 
 #[derive(thiserror::Error, Debug)]
