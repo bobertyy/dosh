@@ -210,6 +210,29 @@ mod test {
         ),
     ];
 
+    const CLASS_WIRE_NAMES: [(AccountClassJson, &str); 5] = [
+        (AccountClassJson::Asset, "asset"),
+        (AccountClassJson::Equity, "equity"),
+        (AccountClassJson::Expense, "expense"),
+        (AccountClassJson::Liability, "liability"),
+        (AccountClassJson::Revenue, "revenue"),
+    ];
+
+    const SUBCLASS_WIRE_NAMES: [(AccountSubclassJson, &str); 12] = [
+        (AccountSubclassJson::Bank, "bank"),
+        (AccountSubclassJson::Current, "current"),
+        (AccountSubclassJson::Depreciation, "depreciation"),
+        (AccountSubclassJson::DirectCosts, "direct_costs"),
+        (AccountSubclassJson::Fixed, "fixed"),
+        (AccountSubclassJson::General, "general"),
+        (AccountSubclassJson::Inventory, "inventory"),
+        (AccountSubclassJson::NonCurrent, "non_current"),
+        (AccountSubclassJson::OtherIncome, "other_income"),
+        (AccountSubclassJson::Overhead, "overhead"),
+        (AccountSubclassJson::Prepayment, "prepayment"),
+        (AccountSubclassJson::Sales, "sales"),
+    ];
+
     #[test]
     fn writes_every_class_to_the_wire() {
         for (domain, class, subclass) in CASES {
@@ -252,26 +275,36 @@ mod test {
 
     #[test]
     fn serialises_every_class_and_subclass_in_snake_case() {
-        assert_eq!(
-            serde_json::to_string(&AccountClassJson::Liability).unwrap(),
-            "\"liability\""
-        );
-        assert_eq!(
-            serde_json::to_string(&AccountSubclassJson::NonCurrent).unwrap(),
-            "\"non_current\""
-        );
+        for (class, wire) in CLASS_WIRE_NAMES {
+            assert_eq!(
+                serde_json::to_string(&class).unwrap(),
+                format!("\"{wire}\"")
+            );
+        }
+
+        for (subclass, wire) in SUBCLASS_WIRE_NAMES {
+            assert_eq!(
+                serde_json::to_string(&subclass).unwrap(),
+                format!("\"{wire}\"")
+            );
+        }
     }
 
     #[test]
     fn deserialises_every_class_and_subclass_from_snake_case() {
-        assert_eq!(
-            serde_json::from_str::<AccountClassJson>("\"liability\"").unwrap(),
-            AccountClassJson::Liability
-        );
-        assert_eq!(
-            serde_json::from_str::<AccountSubclassJson>("\"non_current\"").unwrap(),
-            AccountSubclassJson::NonCurrent
-        );
+        for (class, wire) in CLASS_WIRE_NAMES {
+            assert_eq!(
+                serde_json::from_str::<AccountClassJson>(&format!("\"{wire}\"")).unwrap(),
+                class
+            );
+        }
+
+        for (subclass, wire) in SUBCLASS_WIRE_NAMES {
+            assert_eq!(
+                serde_json::from_str::<AccountSubclassJson>(&format!("\"{wire}\"")).unwrap(),
+                subclass
+            );
+        }
     }
 
     #[test]
