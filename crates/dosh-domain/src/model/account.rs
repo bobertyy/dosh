@@ -30,13 +30,6 @@ pub enum ExpenseClass {
     Overhead,
 }
 
-#[derive(Debug)]
-pub struct Account {
-    code: AccountCode,
-    class: AccountClass,
-    description: Option<String>,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum LiabilityClass {
     Current,
@@ -47,6 +40,13 @@ pub enum LiabilityClass {
 pub enum RevenueClass {
     OtherIncome,
     Sales,
+}
+
+#[derive(Debug)]
+pub struct Account {
+    code: AccountCode,
+    class: AccountClass,
+    description: Option<String>,
 }
 
 #[derive(thiserror::Error, Debug)]
