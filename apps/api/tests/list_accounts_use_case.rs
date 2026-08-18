@@ -6,9 +6,9 @@ use api::adapter::postgres::account_repository::PostgresAccountRepository;
 use common::migrated_database;
 use dosh_domain::{
     model::{
-        account::{Account, AccountClass},
+        account::{Account, AccountClass, AssetClass, RevenueClass},
         account_code::{AccountCode, AccountCodePrefix},
-        account_filter::AccountFilter,
+        account_filter::{AccountClassFilter, AccountFilter},
         page::Page,
         page_cursor::PageCursor,
         page_limit::PageLimit,
@@ -32,7 +32,7 @@ async fn seeded_use_case(cases: &[(&str, AccountClass)]) -> (TestDb, ListAccount
 }
 
 fn asset(code: &str) -> (&str, AccountClass) {
-    (code, AccountClass::Asset)
+    (code, AccountClass::Asset(AssetClass::Bank))
 }
 
 fn first_page_of(limit: u32) -> ListAccountsQuery {
@@ -139,17 +139,17 @@ async fn walking_the_cursor_sees_every_account_exactly_once() {
 #[tokio::test]
 async fn filters_apply_to_every_page() {
     let (_db, use_case) = seeded_use_case(&[
-        ("200", AccountClass::Revenue),
-        ("210", AccountClass::Revenue),
-        ("220", AccountClass::Revenue),
-        ("230", AccountClass::Asset),
-        ("300", AccountClass::Revenue),
+        ("200", AccountClass::Revenue(RevenueClass::Sales)),
+        ("210", AccountClass::Revenue(RevenueClass::Sales)),
+        ("220", AccountClass::Revenue(RevenueClass::Sales)),
+        ("230", AccountClass::Asset(AssetClass::Bank)),
+        ("300", AccountClass::Revenue(RevenueClass::Sales)),
     ])
     .await;
 
     let filter = || {
         AccountFilter::new(
-            Some(AccountClass::Revenue),
+            Some(AccountClassFilter::Revenue(None)),
             Some(AccountCodePrefix::parse("2").unwrap()),
         )
     };
@@ -187,7 +187,7 @@ async fn returns_an_empty_page_when_nothing_matches() {
 
     let page = use_case
         .execute(&ListAccountsQuery::new(
-            AccountFilter::new(Some(AccountClass::Revenue), None),
+            AccountFilter::new(Some(AccountClassFilter::Revenue(None)), None),
             None,
             PageLimit::default(),
         ))
@@ -215,7 +215,7 @@ async fn returns_the_accounts_as_they_were_stored() {
 
     let stored = Account::new_with_description(
         AccountCode::parse("200").unwrap(),
-        AccountClass::Revenue,
+        AccountClass::Revenue(RevenueClass::Sales),
         "Sales revenue".to_string(),
     )
     .unwrap();
@@ -227,7 +227,7 @@ async fn returns_the_accounts_as_they_were_stored() {
 
     let account = page.items().first().unwrap();
     assert_eq!(account.code(), &AccountCode::parse("200").unwrap());
-    assert_eq!(account.class(), &AccountClass::Revenue);
+    assert_eq!(account.class(), &AccountClass::Revenue(RevenueClass::Sales));
     assert_eq!(account.description(), &Some("Sales revenue".to_string()));
 }
 

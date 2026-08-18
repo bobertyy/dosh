@@ -9,7 +9,7 @@ use api::adapter::postgres::{
 use common::{TestDb, migrated_database};
 use dosh_domain::{
     model::{
-        account::{Account, AccountClass},
+        account::{Account, AccountClass, AssetClass},
         account_code::AccountCode,
         amount::Amount,
         journal_date::JournalDate,
@@ -31,7 +31,7 @@ async fn use_case_with_seeded_accounts(
         accounts
             .create(&Account::new(
                 AccountCode::parse(*code).unwrap(),
-                AccountClass::Asset,
+                AccountClass::Asset(AssetClass::Bank),
             ))
             .await
             .unwrap();

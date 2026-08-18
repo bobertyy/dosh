@@ -1,9 +1,12 @@
-use dosh_domain::model::account::AccountClass;
+use dosh_domain::model::{
+    account::{AccountClass, AssetClass, ExpenseClass, LiabilityClass, RevenueClass},
+    account_filter::AccountClassFilter,
+};
 use serde::{Deserialize, Serialize};
 
-/// How an [`AccountClass`] is represented on the wire.
+/// The class half of how an [`AccountClass`] is represented on the wire.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "snake_case")]
 pub enum AccountClassJson {
     Asset,
     Equity,
@@ -12,87 +15,318 @@ pub enum AccountClassJson {
     Revenue,
 }
 
-impl From<AccountClassJson> for AccountClass {
-    fn from(class: AccountClassJson) -> Self {
-        match class {
-            AccountClassJson::Asset => Self::Asset,
-            AccountClassJson::Equity => Self::Equity,
-            AccountClassJson::Expense => Self::Expense,
-            AccountClassJson::Liability => Self::Liability,
-            AccountClassJson::Revenue => Self::Revenue,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AccountSubclassJson {
+    Bank,
+    Current,
+    Depreciation,
+    DirectCosts,
+    Fixed,
+    General,
+    Inventory,
+    NonCurrent,
+    OtherIncome,
+    Overhead,
+    Prepayment,
+    Sales,
+}
+
+/// A class and subclass that together name no [`AccountClass`].
+#[derive(Debug, thiserror::Error)]
+pub enum AccountClassJsonError {
+    #[error("this class needs a subclass")]
+    MissingSubclass,
+    #[error("this subclass does not belong to this class")]
+    MismatchedSubclass,
+}
+
+/// How an [`AccountClass`] is written on the wire.
+pub fn account_class_json(class: &AccountClass) -> (AccountClassJson, Option<AccountSubclassJson>) {
+    use AccountSubclassJson as Sub;
+
+    match class {
+        AccountClass::Asset(AssetClass::Bank) => (AccountClassJson::Asset, Some(Sub::Bank)),
+        AccountClass::Asset(AssetClass::Current) => (AccountClassJson::Asset, Some(Sub::Current)),
+        AccountClass::Asset(AssetClass::Fixed) => (AccountClassJson::Asset, Some(Sub::Fixed)),
+        AccountClass::Asset(AssetClass::Inventory) => {
+            (AccountClassJson::Asset, Some(Sub::Inventory))
         }
+        AccountClass::Asset(AssetClass::NonCurrent) => {
+            (AccountClassJson::Asset, Some(Sub::NonCurrent))
+        }
+        AccountClass::Asset(AssetClass::Prepayment) => {
+            (AccountClassJson::Asset, Some(Sub::Prepayment))
+        }
+        AccountClass::Equity => (AccountClassJson::Equity, None),
+        AccountClass::Expense(ExpenseClass::Depreciation) => {
+            (AccountClassJson::Expense, Some(Sub::Depreciation))
+        }
+        AccountClass::Expense(ExpenseClass::DirectCosts) => {
+            (AccountClassJson::Expense, Some(Sub::DirectCosts))
+        }
+        AccountClass::Expense(ExpenseClass::General) => {
+            (AccountClassJson::Expense, Some(Sub::General))
+        }
+        AccountClass::Expense(ExpenseClass::Overhead) => {
+            (AccountClassJson::Expense, Some(Sub::Overhead))
+        }
+        AccountClass::Liability(LiabilityClass::Current) => {
+            (AccountClassJson::Liability, Some(Sub::Current))
+        }
+        AccountClass::Liability(LiabilityClass::NonCurrent) => {
+            (AccountClassJson::Liability, Some(Sub::NonCurrent))
+        }
+        AccountClass::Revenue(RevenueClass::OtherIncome) => {
+            (AccountClassJson::Revenue, Some(Sub::OtherIncome))
+        }
+        AccountClass::Revenue(RevenueClass::Sales) => (AccountClassJson::Revenue, Some(Sub::Sales)),
     }
 }
 
-impl From<&AccountClass> for AccountClassJson {
-    fn from(class: &AccountClass) -> Self {
-        match class {
-            AccountClass::Asset => Self::Asset,
-            AccountClass::Equity => Self::Equity,
-            AccountClass::Expense => Self::Expense,
-            AccountClass::Liability => Self::Liability,
-            AccountClass::Revenue => Self::Revenue,
+/// The inverse of [`account_class_json`].
+pub fn parse_account_class(
+    class: AccountClassJson,
+    subclass: Option<AccountSubclassJson>,
+) -> Result<AccountClass, AccountClassJsonError> {
+    use AccountClassJson as Class;
+    use AccountSubclassJson as Sub;
+
+    Ok(match (class, subclass) {
+        (Class::Asset, Some(Sub::Bank)) => AccountClass::Asset(AssetClass::Bank),
+        (Class::Asset, Some(Sub::Current)) => AccountClass::Asset(AssetClass::Current),
+        (Class::Asset, Some(Sub::Fixed)) => AccountClass::Asset(AssetClass::Fixed),
+        (Class::Asset, Some(Sub::Inventory)) => AccountClass::Asset(AssetClass::Inventory),
+        (Class::Asset, Some(Sub::NonCurrent)) => AccountClass::Asset(AssetClass::NonCurrent),
+        (Class::Asset, Some(Sub::Prepayment)) => AccountClass::Asset(AssetClass::Prepayment),
+        (Class::Equity, None) => AccountClass::Equity,
+        (Class::Expense, Some(Sub::Depreciation)) => {
+            AccountClass::Expense(ExpenseClass::Depreciation)
         }
+        (Class::Expense, Some(Sub::DirectCosts)) => {
+            AccountClass::Expense(ExpenseClass::DirectCosts)
+        }
+        (Class::Expense, Some(Sub::General)) => AccountClass::Expense(ExpenseClass::General),
+        (Class::Expense, Some(Sub::Overhead)) => AccountClass::Expense(ExpenseClass::Overhead),
+        (Class::Liability, Some(Sub::Current)) => AccountClass::Liability(LiabilityClass::Current),
+        (Class::Liability, Some(Sub::NonCurrent)) => {
+            AccountClass::Liability(LiabilityClass::NonCurrent)
+        }
+        (Class::Revenue, Some(Sub::OtherIncome)) => {
+            AccountClass::Revenue(RevenueClass::OtherIncome)
+        }
+        (Class::Revenue, Some(Sub::Sales)) => AccountClass::Revenue(RevenueClass::Sales),
+        (_, None) => return Err(AccountClassJsonError::MissingSubclass),
+        (_, Some(_)) => return Err(AccountClassJsonError::MismatchedSubclass),
+    })
+}
+
+/// A class on its own asks for every account in it; a class and subclass ask
+/// for that subclass alone.
+pub fn parse_account_class_filter(
+    class: AccountClassJson,
+    subclass: Option<AccountSubclassJson>,
+) -> Result<AccountClassFilter, AccountClassJsonError> {
+    match (class, subclass) {
+        (AccountClassJson::Asset, None) => Ok(AccountClassFilter::Asset(None)),
+        (AccountClassJson::Expense, None) => Ok(AccountClassFilter::Expense(None)),
+        (AccountClassJson::Liability, None) => Ok(AccountClassFilter::Liability(None)),
+        (AccountClassJson::Revenue, None) => Ok(AccountClassFilter::Revenue(None)),
+        (class, subclass) => parse_account_class(class, subclass).map(|class| (&class).into()),
     }
 }
 
 #[cfg(test)]
 mod test {
+    use std::assert_matches;
+
     use super::*;
 
-    const CASES: [(AccountClassJson, AccountClass, &str); 5] = [
-        (AccountClassJson::Asset, AccountClass::Asset, "\"asset\""),
-        (AccountClassJson::Equity, AccountClass::Equity, "\"equity\""),
+    const CASES: [(AccountClass, AccountClassJson, Option<AccountSubclassJson>); 15] = [
         (
+            AccountClass::Asset(AssetClass::Bank),
+            AccountClassJson::Asset,
+            Some(AccountSubclassJson::Bank),
+        ),
+        (
+            AccountClass::Asset(AssetClass::Current),
+            AccountClassJson::Asset,
+            Some(AccountSubclassJson::Current),
+        ),
+        (
+            AccountClass::Asset(AssetClass::Fixed),
+            AccountClassJson::Asset,
+            Some(AccountSubclassJson::Fixed),
+        ),
+        (
+            AccountClass::Asset(AssetClass::Inventory),
+            AccountClassJson::Asset,
+            Some(AccountSubclassJson::Inventory),
+        ),
+        (
+            AccountClass::Asset(AssetClass::NonCurrent),
+            AccountClassJson::Asset,
+            Some(AccountSubclassJson::NonCurrent),
+        ),
+        (
+            AccountClass::Asset(AssetClass::Prepayment),
+            AccountClassJson::Asset,
+            Some(AccountSubclassJson::Prepayment),
+        ),
+        (AccountClass::Equity, AccountClassJson::Equity, None),
+        (
+            AccountClass::Expense(ExpenseClass::Depreciation),
             AccountClassJson::Expense,
-            AccountClass::Expense,
-            "\"expense\"",
+            Some(AccountSubclassJson::Depreciation),
         ),
         (
+            AccountClass::Expense(ExpenseClass::DirectCosts),
+            AccountClassJson::Expense,
+            Some(AccountSubclassJson::DirectCosts),
+        ),
+        (
+            AccountClass::Expense(ExpenseClass::General),
+            AccountClassJson::Expense,
+            Some(AccountSubclassJson::General),
+        ),
+        (
+            AccountClass::Expense(ExpenseClass::Overhead),
+            AccountClassJson::Expense,
+            Some(AccountSubclassJson::Overhead),
+        ),
+        (
+            AccountClass::Liability(LiabilityClass::Current),
             AccountClassJson::Liability,
-            AccountClass::Liability,
-            "\"liability\"",
+            Some(AccountSubclassJson::Current),
         ),
         (
+            AccountClass::Liability(LiabilityClass::NonCurrent),
+            AccountClassJson::Liability,
+            Some(AccountSubclassJson::NonCurrent),
+        ),
+        (
+            AccountClass::Revenue(RevenueClass::OtherIncome),
             AccountClassJson::Revenue,
-            AccountClass::Revenue,
-            "\"revenue\"",
+            Some(AccountSubclassJson::OtherIncome),
+        ),
+        (
+            AccountClass::Revenue(RevenueClass::Sales),
+            AccountClassJson::Revenue,
+            Some(AccountSubclassJson::Sales),
         ),
     ];
 
     #[test]
-    fn maps_every_class_to_the_domain() {
-        for (json, domain, _) in CASES {
-            assert_eq!(AccountClass::from(json), domain);
+    fn writes_every_class_to_the_wire() {
+        for (domain, class, subclass) in CASES {
+            assert_eq!(account_class_json(&domain), (class, subclass));
         }
     }
 
     #[test]
-    fn maps_every_class_from_the_domain() {
-        for (json, domain, _) in CASES {
-            assert_eq!(AccountClassJson::from(&domain), json);
+    fn reads_every_class_back_from_the_wire() {
+        for (domain, class, subclass) in CASES {
+            assert_eq!(parse_account_class(class, subclass).unwrap(), domain);
         }
     }
 
     #[test]
-    fn serialises_every_class_in_lowercase() {
-        for (json, _, expected) in CASES {
-            assert_eq!(serde_json::to_string(&json).unwrap(), expected);
-        }
+    fn returns_error_when_a_class_with_subclasses_has_none() {
+        assert_matches!(
+            parse_account_class(AccountClassJson::Asset, None).unwrap_err(),
+            AccountClassJsonError::MissingSubclass
+        );
     }
 
     #[test]
-    fn deserialises_every_class_from_lowercase() {
-        for (json, _, encoded) in CASES {
-            assert_eq!(
-                serde_json::from_str::<AccountClassJson>(encoded).unwrap(),
-                json
-            );
-        }
+    fn returns_error_when_a_subclass_belongs_to_another_class() {
+        assert_matches!(
+            parse_account_class(AccountClassJson::Asset, Some(AccountSubclassJson::Sales))
+                .unwrap_err(),
+            AccountClassJsonError::MismatchedSubclass
+        );
+    }
+
+    #[test]
+    fn returns_error_when_a_class_without_subclasses_is_given_one() {
+        assert_matches!(
+            parse_account_class(AccountClassJson::Equity, Some(AccountSubclassJson::Bank))
+                .unwrap_err(),
+            AccountClassJsonError::MismatchedSubclass
+        );
+    }
+
+    #[test]
+    fn serialises_every_class_and_subclass_in_snake_case() {
+        assert_eq!(
+            serde_json::to_string(&AccountClassJson::Liability).unwrap(),
+            "\"liability\""
+        );
+        assert_eq!(
+            serde_json::to_string(&AccountSubclassJson::NonCurrent).unwrap(),
+            "\"non_current\""
+        );
+    }
+
+    #[test]
+    fn deserialises_every_class_and_subclass_from_snake_case() {
+        assert_eq!(
+            serde_json::from_str::<AccountClassJson>("\"liability\"").unwrap(),
+            AccountClassJson::Liability
+        );
+        assert_eq!(
+            serde_json::from_str::<AccountSubclassJson>("\"non_current\"").unwrap(),
+            AccountSubclassJson::NonCurrent
+        );
     }
 
     #[test]
     fn rejects_an_unknown_class() {
         assert!(serde_json::from_str::<AccountClassJson>("\"pizza\"").is_err());
+        assert!(serde_json::from_str::<AccountSubclassJson>("\"pizza\"").is_err());
+    }
+
+    mod filter {
+        use super::*;
+
+        #[test]
+        fn a_class_alone_asks_for_every_account_in_it() {
+            assert_eq!(
+                parse_account_class_filter(AccountClassJson::Asset, None).unwrap(),
+                AccountClassFilter::Asset(None)
+            );
+        }
+
+        #[test]
+        fn a_class_without_subclasses_asks_for_itself() {
+            assert_eq!(
+                parse_account_class_filter(AccountClassJson::Equity, None).unwrap(),
+                AccountClassFilter::Equity
+            );
+        }
+
+        #[test]
+        fn a_class_and_subclass_ask_for_that_subclass_alone() {
+            assert_eq!(
+                parse_account_class_filter(
+                    AccountClassJson::Revenue,
+                    Some(AccountSubclassJson::Sales)
+                )
+                .unwrap(),
+                AccountClassFilter::Revenue(Some(RevenueClass::Sales))
+            );
+        }
+
+        #[test]
+        fn returns_error_when_a_subclass_belongs_to_another_class() {
+            assert_matches!(
+                parse_account_class_filter(
+                    AccountClassJson::Revenue,
+                    Some(AccountSubclassJson::Bank)
+                )
+                .unwrap_err(),
+                AccountClassJsonError::MismatchedSubclass
+            );
+        }
     }
 }

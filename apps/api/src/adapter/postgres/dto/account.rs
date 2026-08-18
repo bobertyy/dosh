@@ -57,7 +57,7 @@ impl TryFrom<AccountPgRecord> for Account {
 mod test {
     use std::assert_matches;
 
-    use dosh_domain::model::account::AccountClass;
+    use dosh_domain::model::account::{AccountClass, AssetClass, RevenueClass};
 
     use super::*;
 
@@ -65,7 +65,7 @@ mod test {
     fn maps_an_account_with_a_description() {
         let account = Account::new_with_description(
             AccountCode::parse("200").unwrap(),
-            AccountClass::Revenue,
+            AccountClass::Revenue(RevenueClass::Sales),
             "Sales revenue".to_string(),
         )
         .unwrap();
@@ -74,7 +74,7 @@ mod test {
             AccountPgRecord::from(&account),
             AccountPgRecord {
                 code: "200".to_string(),
-                class: "revenue".to_string(),
+                class: "revenue.sales".to_string(),
                 description: Some("Sales revenue".to_string()),
             }
         );
@@ -82,13 +82,16 @@ mod test {
 
     #[test]
     fn maps_an_account_without_a_description() {
-        let account = Account::new(AccountCode::parse("100").unwrap(), AccountClass::Asset);
+        let account = Account::new(
+            AccountCode::parse("100").unwrap(),
+            AccountClass::Asset(AssetClass::Current),
+        );
 
         assert_eq!(
             AccountPgRecord::from(&account),
             AccountPgRecord {
                 code: "100".to_string(),
-                class: "asset".to_string(),
+                class: "asset.current".to_string(),
                 description: None,
             }
         );
@@ -108,25 +111,25 @@ mod test {
         #[test]
         fn maps_a_row_with_a_description() {
             let account =
-                Account::try_from(record("200", "revenue", Some("Sales revenue"))).unwrap();
+                Account::try_from(record("200", "revenue.sales", Some("Sales revenue"))).unwrap();
 
             assert_eq!(account.code(), &AccountCode::parse("200").unwrap());
-            assert_eq!(account.class(), &AccountClass::Revenue);
+            assert_eq!(account.class(), &AccountClass::Revenue(RevenueClass::Sales));
             assert_eq!(account.description(), &Some("Sales revenue".to_string()));
         }
 
         #[test]
         fn maps_a_row_without_a_description() {
-            let account = Account::try_from(record("100", "asset", None)).unwrap();
+            let account = Account::try_from(record("100", "asset.current", None)).unwrap();
 
             assert_eq!(account.code(), &AccountCode::parse("100").unwrap());
-            assert_eq!(account.class(), &AccountClass::Asset);
+            assert_eq!(account.class(), &AccountClass::Asset(AssetClass::Current));
             assert_eq!(account.description(), &None);
         }
 
         #[test]
         fn returns_error_when_the_stored_code_is_not_a_code() {
-            let error = Account::try_from(record("0123", "asset", None)).unwrap_err();
+            let error = Account::try_from(record("0123", "asset.current", None)).unwrap_err();
 
             assert_matches!(error, AccountPgRecordError::Code(_));
         }
@@ -140,7 +143,7 @@ mod test {
 
         #[test]
         fn returns_error_when_the_stored_description_is_empty() {
-            let error = Account::try_from(record("100", "asset", Some(""))).unwrap_err();
+            let error = Account::try_from(record("100", "asset.current", Some(""))).unwrap_err();
 
             assert_matches!(error, AccountPgRecordError::Account(_));
         }

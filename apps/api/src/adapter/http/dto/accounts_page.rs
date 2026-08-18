@@ -22,16 +22,21 @@ impl From<&Page<Account>> for AccountsPageJson {
 #[cfg(test)]
 mod test {
     use dosh_domain::model::{
-        account::AccountClass, account_code::AccountCode, page_cursor::PageCursor,
+        account::{AccountClass, AssetClass},
+        account_code::AccountCode,
+        page_cursor::PageCursor,
         page_limit::PageLimit,
     };
 
-    use crate::adapter::http::dto::account_class::AccountClassJson;
+    use crate::adapter::http::dto::account_class::{AccountClassJson, AccountSubclassJson};
 
     use super::*;
 
     fn account(code: &str) -> Account {
-        Account::new(AccountCode::parse(code).unwrap(), AccountClass::Asset)
+        Account::new(
+            AccountCode::parse(code).unwrap(),
+            AccountClass::Asset(AssetClass::Bank),
+        )
     }
 
     #[test]
@@ -49,11 +54,13 @@ mod test {
                     AccountJson {
                         code: "100".to_string(),
                         class: AccountClassJson::Asset,
+                        subclass: Some(AccountSubclassJson::Bank),
                         description: None,
                     },
                     AccountJson {
                         code: "110".to_string(),
                         class: AccountClassJson::Asset,
+                        subclass: Some(AccountSubclassJson::Bank),
                         description: None,
                     },
                 ],
