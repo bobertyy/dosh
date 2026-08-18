@@ -5,11 +5,41 @@ use super::{
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum AccountClass {
-    Asset,
+    Asset(AssetClass),
     Equity,
-    Expense,
-    Liability,
-    Revenue,
+    Expense(ExpenseClass),
+    Liability(LiabilityClass),
+    Revenue(RevenueClass),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum AssetClass {
+    Bank,
+    Current,
+    Fixed,
+    Inventory,
+    NonCurrent,
+    Prepayment,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ExpenseClass {
+    Depreciation,
+    DirectCosts,
+    General,
+    Overhead,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum LiabilityClass {
+    Current,
+    NonCurrent,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum RevenueClass {
+    OtherIncome,
+    Sales,
 }
 
 #[derive(Debug)]
@@ -88,13 +118,13 @@ mod test {
         fn returns_account() {
             let account = Account::new_with_description(
                 AccountCode::parse("200").unwrap(),
-                AccountClass::Revenue,
+                AccountClass::Revenue(RevenueClass::Sales),
                 "Sales revenue".to_string(),
             )
             .unwrap();
 
             assert_eq!(account.code, AccountCode::parse("200").unwrap());
-            assert_eq!(account.class, AccountClass::Revenue);
+            assert_eq!(account.class, AccountClass::Revenue(RevenueClass::Sales));
             assert_eq!(account.description, Some("Sales revenue".to_string()));
         }
 
@@ -102,7 +132,7 @@ mod test {
         fn returns_error_when_description_is_empty() {
             let error = Account::new_with_description(
                 AccountCode::parse("200").unwrap(),
-                AccountClass::Revenue,
+                AccountClass::Revenue(RevenueClass::Sales),
                 "".to_string(),
             )
             .unwrap_err();
@@ -117,7 +147,10 @@ mod test {
 
         #[test]
         fn is_positioned_by_its_code() {
-            let account = Account::new(AccountCode::parse("200").unwrap(), AccountClass::Revenue);
+            let account = Account::new(
+                AccountCode::parse("200").unwrap(),
+                AccountClass::Revenue(RevenueClass::Sales),
+            );
 
             assert_eq!(
                 PageCursor::from(&account),

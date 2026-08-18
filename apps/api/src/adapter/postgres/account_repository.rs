@@ -11,7 +11,9 @@ use dosh_domain::{
 };
 use sqlx::PgPool;
 
-use crate::adapter::postgres::dto::{account::AccountPgRecord, account_class::account_class_value};
+use crate::adapter::postgres::dto::{
+    account::AccountPgRecord, account_class::account_class_filter_prefix,
+};
 
 pub struct PostgresAccountRepository {
     pool: PgPool,
@@ -57,19 +59,21 @@ impl AccountRepository for PostgresAccountRepository {
         limit: u32,
     ) -> Pin<Box<dyn Future<Output = Result<Vec<Account>, ListAccountsError>> + Send + 'a>> {
         Box::pin(async move {
-            let class = filter.class().map(account_class_value);
+            let class = filter.class().map(account_class_filter_prefix);
             let code_prefix = filter.code_starts_with().map(ToString::to_string);
             let after = after.map(ToString::to_string);
 
             // Each filter is one nullable parameter that stands aside when it
             // is null, so every combination of them is the same statement.
-            // `starts_with` needs no escaping: a prefix is digits only.
+            // A class prefix matches its own class exactly and every subclass
+            // under it; neither prefix needs escaping, one being digits only and
+            // the other coming from a closed set.
             let records = sqlx::query_as!(
                 AccountPgRecord,
                 r#"
                 SELECT code AS "code!", class AS "class!", description
                 FROM accounts
-                WHERE ($1::text IS NULL OR class = $1)
+                WHERE ($1::text IS NULL OR class = $1 OR starts_with(class, $1 || '.'))
                   AND ($2::text IS NULL OR starts_with(code, $2))
                   AND ($3::text IS NULL OR code > $3)
                 ORDER BY code

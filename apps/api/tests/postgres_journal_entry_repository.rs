@@ -10,7 +10,7 @@ use chrono::NaiveDate;
 use common::{TestDb, migrated_database};
 use dosh_domain::{
     model::{
-        account::{Account, AccountClass},
+        account::{Account, AccountClass, AssetClass, ExpenseClass},
         account_code::AccountCode,
         amount::Amount,
         journal_date::JournalDate,
@@ -76,7 +76,10 @@ async fn ledger() -> (TestDb, PostgresJournalEntryRepository) {
     let db = migrated_database().await;
     let accounts = PostgresAccountRepository::new(db.pool.clone());
 
-    for (code, class) in [("100", AccountClass::Asset), ("300", AccountClass::Expense)] {
+    for (code, class) in [
+        ("100", AccountClass::Asset(AssetClass::Bank)),
+        ("300", AccountClass::Expense(ExpenseClass::General)),
+    ] {
         accounts
             .create(&Account::new(AccountCode::parse(code).unwrap(), class))
             .await
