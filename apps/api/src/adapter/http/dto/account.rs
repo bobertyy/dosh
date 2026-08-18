@@ -5,8 +5,6 @@ use crate::adapter::http::dto::account_class::{
     AccountClassJson, AccountSubclassJson, account_class_json,
 };
 
-/// An [`Account`] as returned to a client. A class with no subclasses is
-/// written without a `subclass`, rather than with a null one.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct AccountJson {
     pub code: String,

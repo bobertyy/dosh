@@ -4,7 +4,6 @@ use dosh_domain::model::{
 };
 use serde::{Deserialize, Serialize};
 
-/// The class half of how an [`AccountClass`] is represented on the wire.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AccountClassJson {
@@ -32,7 +31,6 @@ pub enum AccountSubclassJson {
     Sales,
 }
 
-/// A class and subclass that together name no [`AccountClass`].
 #[derive(Debug, thiserror::Error)]
 pub enum AccountClassJsonError {
     #[error("this class needs a subclass")]
@@ -41,7 +39,6 @@ pub enum AccountClassJsonError {
     MismatchedSubclass,
 }
 
-/// How an [`AccountClass`] is written on the wire.
 pub fn account_class_json(class: &AccountClass) -> (AccountClassJson, Option<AccountSubclassJson>) {
     use AccountSubclassJson as Sub;
 
@@ -84,7 +81,6 @@ pub fn account_class_json(class: &AccountClass) -> (AccountClassJson, Option<Acc
     }
 }
 
-/// The inverse of [`account_class_json`].
 pub fn parse_account_class(
     class: AccountClassJson,
     subclass: Option<AccountSubclassJson>,
@@ -121,8 +117,6 @@ pub fn parse_account_class(
     })
 }
 
-/// A class on its own asks for every account in it; a class and subclass ask
-/// for that subclass alone.
 pub fn parse_account_class_filter(
     class: AccountClassJson,
     subclass: Option<AccountSubclassJson>,

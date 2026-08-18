@@ -10,8 +10,6 @@ pub struct UnknownAccountClassPgValue(String);
 
 /// How an [`AccountClass`] is stored in Postgres: the class, and where the
 /// class has subclasses, the subclass after a dot.
-///
-/// The values must match the `class` check constraint on the `accounts` table.
 pub fn account_class_value(class: &AccountClass) -> &'static str {
     match class {
         AccountClass::Asset(AssetClass::Bank) => "asset.bank",

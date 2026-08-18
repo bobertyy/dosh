@@ -3,8 +3,6 @@ use crate::model::{
     account_code::AccountCodePrefix,
 };
 
-/// Which classes a caller is interested in: a whole class, or one subclass of
-/// it. A class that has no subclasses names itself.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum AccountClassFilter {
     Asset(Option<AssetClass>),
